@@ -1,0 +1,144 @@
+\vspace{5px}
+\subsection{Tres Colores} 
+
+
+Este filtro tiene una sola forma de iterar, y en cada itecarión procesa 4 pixeles. Primero extiende a dword cada componenete, para que al hacer la suma no exceda, luego hace una conversión a float y divide por 3 obteniendo W, luego se procesan los colores crema, verde y rojo para cada pixel correspondiente.\\
+\textbf{Descripción de una iteración}:\\
+Leer de memoria:\\
+$Xmm0 = [argb| argb| argb | argb].$\\
+Se hacen 3 copias y se las shiftean para tener cada componente en dword:\\ 
+$Xmm1 = [r| r| r| r]$\\
+$Xmm2 = [g| g| g| g]$\\
+$Xmm3 = [b| b| b| b]$\\
+Se obtiene la suma en dword:\\
+$Xmm1 = [r+g+b| r+g+b| r+g+b| r+g+b]$\\
+Se castean a float single precisión, se divide por 3 y se castea a int:\\
+$Xmm1 = [0,0,0,W| 0,0,0,W| 0,0,0,W| 0,0,0,W]$(estan en dword, pero ocupan 1 byte)\\
+Se acomoda $Xmm1$ para que tenga los 3 bytes de cada dword cargado con $W$:\\
+$Xmm1 = [0,W,W,W| 0,W,W,W| 0,W,W,W| 0,W,W,W]$\\
+Se acomoda en $Xmm2$ los $W$ de los dos primeros píxeles y en $Xmm3$ los $W$ de los dos segundos píxeles:\\
+$Xmm2 = [0,0,0,W|0,W,0,W|0,W,0,W|0,W,0,W]$\\
+$Xmm3 = [0,0,0,W|0,W,0,W|0,W,0,W|0,W,0,W]$\\
+Se limpa $Xmm0$ para que sea acumulador:\\
+$Xmm0 = [0|0|0|0]$\\
+Se procesan los crema y con un pand se filtra los que dieron negativo:\\
+$Xmm0 = [cremas|cremas|cremas|cremas]$\\
+Se procesan los verdes y con un pand se filtra los que dieron negativo:\\
+$Xmm0 = [cremas y verdes|cremas y verdes|cremas y verdes|cremas y verdes]$\\
+Se procesan los rojos y con un pand se filtra los que dieron negativo:\\
+$Xmm0 = [rojos, cremas y verdes|rojos, cremas y verdes|rojos, cremas y verdes|rojos, cremas y verdes]$\\
+Se escribe a memoria.\\
+
+
+
+Dentro de este filtro elegimos tomar de a 4 píxeles donde dividimos en 2 partes el cálculo de estos mismos. 
+La primera parte consiste en calcular $W$, para cada uno de los píxeles. Para esto duplicamos los bytes de colores individuales en 4 registros distintos para luego sumarlos y obtengamos algo como:
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+      & dword     & dword     & dword     & dword     \\ \hline
+xmm1: & R     & R     & R     & R     \\ \hline
++     & +     & +     & +     & +     \\ \hline
+xmm2: & G     & G     & G     & G     \\ \hline
++     & +     & +     & +     & +     \\ \hline
+xmm3: & B     & B     & B     & B     \\ \hline
+=     & =     & =     & =     & =     \\ \hline
+xmm1: & R+G+B & R+G+B & R+G+B & R+G+B \\ \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+De esta manera obtenemos el cálculo $R+G+B$ de 4 píxeles. Una vez obtenido este valor lo pasamos a float, ya que siempre trabajamos los valores en int. Luego de realizar esta conversión dividimos por 3 para obtener el valor de $W$.
+
+Para elegir entre los colores: $crema, rojo, verde$ en cada pixel se realiza una serie de comparaciones para evaluar el valor correcto, dejando así, un registro $XMM$ con uno de los tres tres colores en cada $doubleword$. Cabe destacar que para este paso se guardan etiquetas con los valores de los 3 colores a decidir multiplicados por 3, esto ahorra instrucciones a la hora de ejecución.
+
+Una hecha cada una de las comparaciones para chequear que color le corresponde a cada $W$, lo sumamos y dividimos todo por 4 y obtenemos:
+
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+      & dword     & dword     & dword     & dword     \\ \hline
+xmm1: & (CVR + W)/4     & (CVR + W)/4     & (CVR + W)/4     & (CVR + W)/4     \\ \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+Siendo CVR el color correspondiente para cada pixel.
+Una vez obtenido este resultado escribimos en memoria el dato, para luego continuar ciclando la imagen. 
+
+
+\subsection{Efecto Bayer}
+
+En este filtro trabajamos fila por fila eligiendo primero tomando los colores $Rojo$ y $Verde$ primero y en la segunda fila iteramos usando los colores $Verde$ y $Azul$. Estos 2 ciclos se realizan $n/2$ cada uno
+por lo que cubrimos toda la imagen. 
+Por lo tanto para cada píxel del primer ciclo tendremos algo similar a:
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+dword     & dword     & dword     & dword     \\ \hline
+0 R 0 0     & 0 0 G 0     & 0 R 0 0     & 0 0 G 0        \\ \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+Luego, para la siguiente fila obtendremos lo siguiente:
+
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+dword     & dword     & dword     & dword     \\ \hline
+0 0 G 0     & 0 0 0 B     & 0 0 G 0     & 0 0 0 B       \\ \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+
+Dentro de cada ciclo accedemos dos veces a memoria, uno para traer los datos y otro para poner los nuevos píxeles modificados. Se utilizó la instrucción shuffle ya que resulta mucho más sencillo el manejo de los píxeles a la hora de elegir el color correcto para cada uno de ellos. 
+
+
+\subsection{Cambia Color}
+
+Para comenzar este filtro primero calculamos los valores de $N_r$, $N_b$, $N_b$, $C_r$, $C_g$, $C_b$, $lim$ a partir de los parámetros estableciendo registros $XMM$ llenos de estos mismos valores para así poder trabajar de a 4 píxeles a la vez. 
+
+Una vez guardados los valores mencionados comenzaremos a ciclar sobre la imagen trayendo de a 4 píxeles. Paso siguiente, se calculo paso a paso el valor de $d$ para cada uno de estos píxeles con los siguientes pasos:
+
+%Acá voy a agregar alguna manera bonita de poner los xmm, la estoy pensando todavía
+\begin{itemize}
+  \item Calcular los $\Delta B$, $\Delta R$, $\Delta G$ para cada píxel, por lo que obtendremos algo similar a $xmm = | \Delta R | \Delta R | \Delta R | \Delta R |$ para cada color. Este proceso se realiza en $int$ hasta la unión de todas las sumas que contienen ya que nunca superamos 1 byte en cada $dword$ que manejamos. Antes de realizar los últimos pasos para calcular $d$ y $c$, convertimos a float para no perder precision en la división por 256 que se encuentra adento, y tampoco para saturar ya que la suma de todos los valores antes de aplicar la raíz cuadrada podría saturar. Cabe destacar que también se pasa a float para calcular correctamente la raíz cuadrada. 
+  \item El siguiente paso es calcular el valor designado en caso de que $d<lim$. Este mismo se calcula con 4 píxeles también y para cada uno realizamos las operaciones para generar $1-c$ y $N_r,N_b,N_g$ de cada byte del píxel, antes de multiplicar $1-c$ por cada respectivo valor, pasamos a float para no perder precisión. 
+\end{itemize}
+
+Una vez terminados estos pasos tenemos el resultado procesado de 4 píxeles que volvemos a dejar en memoria.
+
+
+\subsection{Edge Sobel}
+El algoritmo comenzara llenando la parte que se procesa (toda la matriz, excepto los bordes),
+y luego completara los bordes de la matriz con 0.
+Tiene cuatro diferentes tipos de iteraciones y un caso que es tratado de forma diferente.
+\begin{itemize}
+\item Llenado de la matriz con los pixeles procesados, se excluyen los bordes pues no se pueden aplicar los operadores.
+\item Llenado de la última fila a procesar.
+\item Llenado de los bordes de los costados.
+\item El ultimo caso es para poder llenar la primer fila y la ultima con ceros, la forma de iterar es la misma pero cambia el lugar desde donde inicia cada una.
+\end{itemize}
+\subsubsection{Llenado de los pixeles procesados usando parte baja de un xmm} Se tomara la parte baja de un registro xmm y los 8 bytes de la parte baja serán extendidos a 8 words para que al hacer las cuentas no perdamos precisión, como se calcularán 4 pixeles, estaremos trabajando con 6 bytes, los 10 bytes restantes no se utilizarán. Esto solo sirve para llenar parte de la matriz, por que al querer seguir iterando, llegaremos a la última posición y necesitariamos leer 10 bytes demás, pero nos saldriamos de la matriz.
+
+\subsubsection{Llenado de los pixeles procesadosusando parte alta de un xmm} Responde al problema que surgio anteriormente, entonces ahora al leer en un registro xmm tranjaremos con la parte alta, como necesitamos procesar 4 pixeles a la hora de acceder a la matriz necesitaremos estar 10 bytes (posiciones) atras, asi poder acceder a los 6 bytes con los que se procesan 4, luego por la forma en como iniciamos y dado que la cantidad de pixeles en la fila es muliplo de 8, no podremos  procesar los dos ultimos bytes y estos se harán como caso aparte.
+
+
+
+
+\subsubsection{Llenado de los bordes de los costados} La matriz es accedienda desde último byte de la primer fila, copia su valor en un xmm, hace un shift de 2 bytes para poner los 2 primeros bytes en 0 y luego un shift de 2 bytes para reacomodar, con esto se puso en 0 los 2 byte de los costados, luego se incementa en cantidad de columnas a la posición y se procede de la misma forma hasta llegar a la ante-ultima fila.
+
+\subsubsection{Llenado de los bordes superior e inferior}
+	Para la \textbf{primer fila}, primero se lee con el registro xmm y se shiftean 8 bytes, se divide la cantidad de columnas por 8 y se procede a iterar cantidad de (cantidad de pixeles en fila/8) -1 para poder llenas la primer fila.
+	Para la \textbf{ultima fila}, se lee desde 8 bytes antes y se hace un shift para poder poner en 0 los primeros 8 bytes de la ultima fila, luego se procede a iterar cantidad de (cantidad de pixeles en fila/8) -1 para poder llenar la matriz.
+

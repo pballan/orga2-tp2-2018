@@ -1,0 +1,65 @@
+
+Se compararán los filtros implementadas en lenguage C compilada con máximas optimizaciones (o3) y la versión ASM utilizando el set de instrucciones
+SSE. \\
+Para medir el rendimiento usaremos la cantidad de ciclos de ejecución, en particular se tomara la mediana de las mediciones.\\
+Se útilizara el registro Time Stamp Counter(TSC) que es global del procesador y se ve afectado por una serie de factores,
+como por ejemplo el scheluder para realizar un cambio de contexto, esto implicará contar muchos más ciclos (outliers)
+ que si nuestra función se ejecutara sin interrupciones, con lo cual se decide tomar la mediana que es robusta a outliers.\\
+El procesamiento digital de imágenes es el conjunto de técnicas que se aplican a las imágenes digitales con el objetivo de mejorar la calidad o facilitar la búsqueda de información. 
+\\
+Siempre se hacen las cuentas independientemente del contenido de la imagen en si.\\
+
+\subsubsection{edgeSobel}
+El algoritmo comenzara llenando la parte que se procesa (toda la matriz, excepto los bordes),
+y luego completara los bordes de la matriz con 0.\\
+Tiene cuatro diferentes tipos de iteraciones y un caso que es tratado de forma diferente.\\
+\textbf{caso 1}:\\
+	Llenado de la matriz con los pixeles procesados, se excluyen los bordes pues no se pueden aplicar los operadores.\\
+\textbf{caso 2}:\\
+	Llenado de la última fila a procesar.\\
+\textbf{caso 3}:\\
+	Llenado de los bordes de los costados.\\
+\textbf{caso 4}:\\
+	El ultimo caso es para poder llenar la primer fila y la ultima con ceros, la forma de iterar es la misma pero cambia el lugar desde donde inicia cada una.\\
+
+\textbf{1. Llenado de los pixeles procesados usando parte baja de un xmm}:\\ Se tomara la parte baja de un registro xmm y los 8 bytes de la parte baja serán extendidos a 8 words para que al hacer las cuentas no perdamos precisión, como se calcularán 4 pixeles, estaremos trabajando con 6 bytes, los 10 bytes restantes no se utilizarán. Esto solo sirve para llenar parte de la matriz, por que al querer seguir iterando, llegaremos a la última posición y necesitariamos leer 10 bytes demás, pero nos saldriamos de la matriz.\\
+
+\textbf{2. Llenado de los pixeles procesadosusando parte alta de un xmm}:\\ Responde al problema que surgio anteriormente, entonces ahora al leer en un registro xmm tranjaremos con la parte alta, como necesitamos procesar 4 pixeles a la hora de acceder a la matriz necesitaremos estar 10 bytes (posiciones) atras, asi poder acceder a los 6 bytes con los que se procesan 4, luego por la forma en como iniciamos y dado que la cantidad de pixeles en la fila es muliplo de 8, no podremos  procesar los dos ultimos bytes y estos se harán como caso aparte.\\
+
+\textbf{3. Llenado de los bordes de los costados}:\\ La matriz es accedienda desde último byte de la primer fila, copia su valor en un xmm, hace un shift de 2 bytes para poner los 2 primeros bytes en 0 y luego un shift de 2 bytes para reacomodar, con esto se puso en 0 los 2 byte de los costados, luego se incementa en cantidad de columnas a la posición y se procede de la misma forma hasta llegar a la ante-ultima fila.\\
+
+\textbf{4. Llenado de los bordes superior e inferior}:\\
+	Para la \textbf{primer fila}, primero se lee con el registro xmm y se shiftean 8 bytes, se divide la cantidad de columnas por 8 y se procede a iterar cantidad de (cantidad de pixeles en fila/8)-1 para poder llenas la primer fila.\\
+	Para la \textbf{ultima fila}, se lee desde 8 bytes antes y se hace un shift para poder poner en 0 los primeros 8 bytes de la ultima fila, luego se procede a iterar cantidad de (cantidad de pixeles en fila/8)-1 para poder llenar la matriz.\\
+
+
+\subsubsection{Tres Colores}
+Este filtro tiene una sola forma de iterar, y en cada itecarión procesa 4 pixeles. Primero extiende a dword cada componenete, para que al hacer la suma no exceda, luego hace una conversión a float y divide por 3 obteniendo W, luego procesa los colores crema, verde y rojo para cada pixel.\\
+\textbf{Descripción de una iteración}:\\
+Leer de memoria:\\
+$Xmm0 = [argb| argb| argb | argb].$\\
+Se hacen 3 copias y se las shiftean para tener cada componente en dword:\\ 
+$Xmm1 = [r| r| r| r]$\\
+$Xmm2 = [g| g| g| g]$\\
+$Xmm3 = [b| b| b| b]$\\
+Se obtiene la suma en dword:\\
+$Xmm1 = [r+g+b| r+g+b| r+g+b| r+g+b]$\\
+Se castean a float single precisión, se divide por 3 y se castea a int:\\
+$Xmm1 = [0,0,0,W| 0,0,0,W| 0,0,0,W| 0,0,0,W]$(estan en dword, pero ocupan 1 byte)\\
+Se acomoda $Xmm1$ para que tenga los 3 bytes de cada dword cargado con $W$:\\
+$Xmm1 = [0,W,W,W| 0,W,W,W| 0,W,W,W| 0,W,W,W]$\\
+Se acomoda en $Xmm2$ los $W$ de los dos primeros píxeles y en $Xmm3$ los $W$ de los dos segundos píxeles:\\
+$Xmm2 = [0,0,0,W|0,W,0,W|0,W,0,W|0,W,0,W]$\\
+$Xmm3 = [0,0,0,W|0,W,0,W|0,W,0,W|0,W,0,W]$\\
+Se limpa $Xmm0$ para que sea acumulador:\\
+$Xmm0 = [0|0|0|0]$\\
+Se procesan los crema y con un pand se filtra los que dieron negativo:\\
+$Xmm0 = [cremas|cremas|cremas|cremas]$\\
+Se procesan los verdes y con un pand se filtra los que dieron negativo:\\
+$Xmm0 = [cremas y verdes|cremas y verdes|cremas y verdes|cremas y verdes]$\\
+Se procesan los rojos y con un pand se filtra los que dieron negativo:\\
+$Xmm0 = [rojos, cremas y verdes|rojos, cremas y verdes|rojos, cremas y verdes|rojos, cremas y verdes]$\\
+Se escribe a memoria.\\
+\subsubsection{Efecto Bayer}
+
+\subsubsection{Cambia Color}

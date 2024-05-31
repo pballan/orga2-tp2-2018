@@ -1,0 +1,9 @@
+Como conclusión general, podemos ver como los cambios en ASM y C se pronuncian en cada uno de los filtros. Así vemos como poder trabajar a más bajo nivel para situaciones específicas puede resultar muy beneficioso si lo que buscamos es optimizar los tiempos, como contraparte es más complejo trabajar en ASM que en C.
+
+
+\subsection{Tres Colores y Efecto Bayer}
+
+En estos dos filtros nos resulto importante destacar que los cambios de ASM a C fueron considerablemente distintos en los códigos de cada uno. En $Efecto$ $Bayer$ las mejoras fueron mucho más notables que en $Tres$ $Colores$, vale aclarar que esto es en comparación a C, no en tiempos concretos ya que el filtro $Efecto$ $Bayer$ tarda más en general que el segundo. 
+
+Estamos convencidos que esta diferencia de mejoras se debe a la utilización de instrucciones como $Shuffle$ en $Tres$ $Colores$, que es una instrucción costosa. También existe una cantidad más grande de instrucciones que se utilizan para calcular el filtro de $Tres$ $Colores$
+

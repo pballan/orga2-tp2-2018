@@ -1,0 +1,32 @@
+Este trabajo consiste en implementar filtros gráficos utilizando el modelo de procesamiento SIMD. De esta manera procesaremos, por ejemplo, 4 píxeles de una imagen al mismo tiempo. Se busca encontrar una mejora significativa entre la utilización de dichos registros $XMM$ contra el proceso provisto en el lenguaje de programación $C$. 
+
+% Esta parte no me cierra, la puedo mejorar.
+Se abarcaran 4 conocidos filtros de imágenes distintos provistos por la cátedra. Estos filtros son:
+
+\subsection{Tres Colores}
+
+Este filtro realiza un cambio en los colores de cada pixel en base a 3 colores fijos que son: 
+
+\begin{itemize}
+  \item Crema (R: 236, G: 233, B: 214)
+  \item Verde (R: 0, G: 112, B: 110)
+  \item Rojo (R: 244, G: 88, B: 65)
+\end{itemize}
+
+La definición de cual de estos colores se va a elegir depende directamente del brillo que se calcula con la siguiente fórmula:
+
+$W = \floor{\frac{(Pixel_r + Pixel_g + Pixel_b)}{3}}$
+
+Para cada píxel conseguiremos $W$ que luego definirá cual de los 3 colores mencionados anteriormente es el correcto para utilizar.
+Estos colores representan una $3/4$ del nuevo color que se va a obtener para cada píxel.
+
+\subsection{Efecto Bayer}
+\subsection{Cambia Color}
+\subsection{Edge Sobel}
+
+%Agregar imágenes lindas para cada filtro, quizás algunas de internet o algunas que le hagamos posta el filtro.
+El filtro Tres Colores es usado para ...\\
+El filtro Bayer es usado para ... . La razón de que se use mayor cantidad de puntos verdes es que el ojo humano es más sencible a ese color.\\
+EL filtro Cambia Colores es usado para ...\\
+El cuarto filtro es Edge Sobel, el cual utiliza la vecindad de Moore para hacer una aproximaci\'on de las derivadas parciles, este filtro es \'util para poder detectar los bordes de la imagen.\\
+
